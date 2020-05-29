@@ -28,6 +28,7 @@ class MKLDNNMemoryNode {
         return _id;
     }
     virtual void setInputNode(MKLDNNNode *) = 0;
+    virtual void storeBytes(const uint8_t * pBytes, size_t nBytes) = 0;
 };
 class MKLDNNMemoryOutputNode;
 #if defined (COMPILED_CPU_MKLDNN_INPUT_NODE)
@@ -79,6 +80,8 @@ class MKLDNNMemoryOutputNode : public MKLDNNNode, public MKLDNNMemoryNode {
     void setInputNode(MKLDNNNode* node) override {
         inputNode = node;
     }
+    void storeBytes(const uint8_t * pBytes, size_t nBytes) override {}
+
  private:
     /**
      * @brief keeps reference to input sibling node
@@ -97,9 +100,12 @@ public:
     bool created() const override {
         return getType() == MemoryInput;
     }
+    void execute(mkldnn::stream strm) override;
 
     void setInputNode(MKLDNNNode* node) override {}
+    void storeBytes(const uint8_t * pBytes, size_t nBytes) override;
  private:
+    std::vector<uint8_t> storedBytes;
     static Register<MKLDNNMemoryInputNode> reg;
     MKLDNNMemoryNodeVirtualEdge::Holder* holder = nullptr;
 };

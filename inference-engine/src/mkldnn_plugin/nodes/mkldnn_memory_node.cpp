@@ -58,8 +58,9 @@ void MKLDNNMemoryOutputNode::execute(mkldnn::stream strm)  {
     float *dst_ptr = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemory().GetData()) +
             getChildEdgeAt(0)->getMemory().GetDescriptor().data.layout_desc.blocking.offset_padding;
 
-    // TODO: this can be eliminated by completely removing MKLDNN memory output NODE, to fuse it with output of prev layer
-    memcpy(dst_ptr, src_ptr, srcMemory.GetSize());
+    auto inputMemoryNode = dynamic_cast<MKLDNNMemoryNode*>(inputNode);
+    IE_ASSERT(inputMemoryNode != nullptr);
+    inputMemoryNode->storeBytes(reinterpret_cast<const uint8_t*>(src_ptr), srcMemory.GetSize());
 }
 
 #if defined (COMPILED_CPU_MKLDNN_INPUT_NODE)
@@ -72,6 +73,17 @@ MKLDNNMemoryInputNode::MKLDNNMemoryInputNode(const InferenceEngine::CNNLayerPtr&
 
 MKLDNNMemoryInputNode::~MKLDNNMemoryInputNode() {
     MKLDNNMemoryNodeVirtualEdge::remove(this, holder);
+}
+void MKLDNNMemoryInputNode::storeBytes(const uint8_t * pBytes, size_t nBytes) {
+    storedBytes.resize(nBytes);
+    memcpy(&storedBytes.front(), pBytes, nBytes);
+}
+
+void MKLDNNMemoryInputNode::execute(mkldnn::stream strm) {
+    float *dst_ptr = reinterpret_cast<float*>(getChildEdgeAt(0)->getMemory().GetData()) +
+        getChildEdgeAt(0)->getMemory().GetDescriptor().data.layout_desc.blocking.offset_padding;
+
+    memcpy(&storedBytes.front(), dst_ptr, storedBytes.size());
 }
 
 MKLDNNMemoryNodeVirtualEdge::Holder* MKLDNNMemoryNodeVirtualEdge::registerInput(MKLDNNMemoryInputNode * node) {
